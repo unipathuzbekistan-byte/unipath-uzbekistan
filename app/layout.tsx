@@ -8,8 +8,6 @@ export const metadata: Metadata = {
   description: "Your path to global success",
   icons: {
     icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
   },
 };
 

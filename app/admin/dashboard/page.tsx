@@ -5,22 +5,18 @@ import { supabase } from "@/lib/supabase";
 
 const ADMIN_EMAIL = "unipathuzbekistan@gmail.com";
 
-type ApplicationStatus = "pending" | "accepted" | "rejected";
-
 type Application = {
   id: string;
-  user_id?: string;
   full_name: string;
   email: string;
-  phone?: string | null;
-  telegram?: string | null;
-  program_type: string;
-  target_country?: string | null;
-  dream_university?: string | null;
-  scholarship?: string | null;
-  goal: string;
-  status: ApplicationStatus;
-  created_at?: string;
+  phone?: string;
+  telegram?: string;
+  program_type?: string;
+  scholarship?: string;
+  target_country?: string;
+  dream_university?: string;
+  goal?: string;
+  status: string;
 };
 
 type Mentor = {
@@ -28,42 +24,38 @@ type Mentor = {
   name: string;
   role: string;
   bio: string;
-  expertise?: string | null;
-  image_url?: string | null;
-  created_at?: string;
+  expertise?: string;
+  image_url?: string;
 };
 
 type University = {
   id: string;
   name: string;
-  country: string;
-  world_rank?: string | null;
-  acceptance_rate?: string | null;
-  requirements?: string | null;
-  tier: string;
-  image_url?: string | null;
-  website_url?: string | null;
-  created_at?: string;
+  country?: string;
+  world_rank?: string;
+  acceptance_rate?: string;
+  requirements?: string;
+  tier?: string;
+  image_url?: string;
+  website_url?: string;
 };
 
 type Program = {
   id: string;
   title: string;
-  category: string;
-  short_description: string;
-  benefits: string;
-  cta_text: string;
-  created_at?: string;
+  category?: string;
+  short_description?: string;
+  benefits?: string;
+  cta_text?: string;
 };
 
 type EventItem = {
   id: string;
   title: string;
-  date?: string | null;
-  location?: string | null;
-  description?: string | null;
-  image_url?: string | null;
-  created_at?: string;
+  date?: string;
+  location?: string;
+  description?: string;
+  image_url?: string;
 };
 
 export default function AdminDashboardPage() {
@@ -74,36 +66,30 @@ export default function AdminDashboardPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
 
   const [editingMentor, setEditingMentor] = useState<Mentor | null>(null);
-  const [editingUniversity, setEditingUniversity] = useState<University | null>(
-    null
-  );
+  const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [mentorUploading, setMentorUploading] = useState(false);
+  const [mentorEditUploading, setMentorEditUploading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     const checkAdminAndLoad = async () => {
       try {
-        setLoading(true);
-
         const {
           data: { user },
           error,
         } = await supabase.auth.getUser();
 
-        if (error) throw error;
-
-        if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        if (error || !user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
           window.location.href = "/admin/login";
           return;
         }
 
         await fetchAllData();
       } catch (error) {
-        console.error("Admin auth check failed:", error);
+        console.error(error);
         window.location.href = "/admin/login";
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -112,6 +98,8 @@ export default function AdminDashboardPage() {
 
   const fetchAllData = async () => {
     try {
+      setLoading(true);
+
       const [
         applicationsRes,
         mentorsRes,
@@ -153,12 +141,22 @@ export default function AdminDashboardPage() {
       setPrograms((programsRes.data as Program[]) || []);
       setEvents((eventsRes.data as EventItem[]) || []);
     } catch (error: any) {
-      console.error("Error fetching admin data:", error);
-      alert(error?.message || "Failed to load admin dashboard.");
+      alert("Error loading dashboard: " + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const updateStatus = async (id: string, status: ApplicationStatus) => {
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      window.location.href = "/admin/login";
+    } catch (error: any) {
+      alert("Error logging out: " + error.message);
+    }
+  };
+
+  const updateStatus = async (id: string, status: string) => {
     try {
       setActionLoading(true);
 
@@ -167,53 +165,81 @@ export default function AdminDashboardPage() {
         .update({ status })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        alert("Error updating status: " + error.message);
+        return;
+      }
 
       await fetchAllData();
-    } catch (error: any) {
-      alert("Error updating application: " + error.message);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      window.location.href = "/admin/login";
-    } catch (error: any) {
-      alert("Error logging out: " + error.message);
+  const getTelegramLink = (telegram?: string) => {
+    if (!telegram) return "#";
+    const clean = telegram.replace("@", "").trim();
+    return `https://t.me/${clean}`;
+  };
+
+  const uploadMentorImage = async (file: File) => {
+    const ext = file.name.split(".").pop() || "png";
+    const fileName = `mentor-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("mentors")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
     }
+
+    const { data } = supabase.storage.from("mentors").getPublicUrl(fileName);
+    return data.publicUrl;
   };
 
   const handleAddMentor = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setMentorUploading(true);
 
     try {
-      setActionLoading(true);
-
       const form = e.currentTarget;
-      const formData = new FormData(form);
+      const fd = new FormData(form);
 
-      const payload = {
-        name: String(formData.get("name") || "").trim(),
-        role: String(formData.get("role") || "").trim(),
-        bio: String(formData.get("bio") || "").trim(),
-        expertise: String(formData.get("expertise") || "").trim(),
-        image_url: String(formData.get("image_url") || "").trim(),
-      };
+      const file = fd.get("mentor_photo") as File | null;
+      let imageUrl = "";
 
-      const { error } = await supabase.from("mentors").insert([payload]);
-      if (error) throw error;
+      if (file && file.size > 0) {
+        imageUrl = await uploadMentorImage(file);
+      }
+
+      const { error } = await supabase.from("mentors").insert([
+        {
+          name: String(fd.get("name") || "").trim(),
+          role: String(fd.get("role") || "").trim(),
+          bio: String(fd.get("bio") || "").trim(),
+          expertise: String(fd.get("expertise") || "").trim(),
+          image_url: imageUrl,
+        },
+      ]);
+
+      if (error) {
+        alert("Error adding mentor: " + error.message);
+        return;
+      }
 
       alert("Mentor added!");
       form.reset();
       await fetchAllData();
     } catch (error: any) {
-      alert("Error adding mentor: " + error.message);
+      alert("Upload error: " + error.message);
     } finally {
-      setActionLoading(false);
+      setMentorUploading(false);
     }
   };
 
@@ -221,68 +247,89 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!editingMentor) return;
 
+    setMentorEditUploading(true);
+
     try {
-      setActionLoading(true);
-
       const form = e.currentTarget;
-      const formData = new FormData(form);
+      const fd = new FormData(form);
 
-      const payload = {
-        name: String(formData.get("name") || "").trim(),
-        role: String(formData.get("role") || "").trim(),
-        bio: String(formData.get("bio") || "").trim(),
-        expertise: String(formData.get("expertise") || "").trim(),
-        image_url: String(formData.get("image_url") || "").trim(),
-      };
+      const file = fd.get("mentor_photo") as File | null;
+      let imageUrl = editingMentor.image_url || "";
+
+      if (file && file.size > 0) {
+        imageUrl = await uploadMentorImage(file);
+      }
 
       const { error } = await supabase
         .from("mentors")
-        .update(payload)
+        .update({
+          name: String(fd.get("name") || "").trim(),
+          role: String(fd.get("role") || "").trim(),
+          bio: String(fd.get("bio") || "").trim(),
+          expertise: String(fd.get("expertise") || "").trim(),
+          image_url: imageUrl,
+        })
         .eq("id", editingMentor.id);
 
-      if (error) throw error;
+      if (error) {
+        alert("Error updating mentor: " + error.message);
+        return;
+      }
 
       alert("Mentor updated!");
       setEditingMentor(null);
       await fetchAllData();
     } catch (error: any) {
-      alert("Error updating mentor: " + error.message);
+      alert("Upload error: " + error.message);
     } finally {
-      setActionLoading(false);
+      setMentorEditUploading(false);
     }
+  };
+
+  const deleteMentor = async (id: string) => {
+    const ok = confirm("Delete this mentor?");
+    if (!ok) return;
+
+    const { error } = await supabase.from("mentors").delete().eq("id", id);
+
+    if (error) {
+      alert("Error deleting mentor: " + error.message);
+      return;
+    }
+
+    if (editingMentor?.id === id) {
+      setEditingMentor(null);
+    }
+
+    await fetchAllData();
   };
 
   const handleAddUniversity = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
 
-    try {
-      setActionLoading(true);
+    const { error } = await supabase.from("universities").insert([
+      {
+        name: String(fd.get("name") || "").trim(),
+        country: String(fd.get("country") || "").trim(),
+        world_rank: String(fd.get("world_rank") || "").trim(),
+        acceptance_rate: String(fd.get("acceptance_rate") || "").trim(),
+        requirements: String(fd.get("requirements") || "").trim(),
+        tier: String(fd.get("tier") || "").trim(),
+        image_url: String(fd.get("image_url") || "").trim(),
+        website_url: String(fd.get("website_url") || "").trim(),
+      },
+    ]);
 
-      const form = e.currentTarget;
-      const formData = new FormData(form);
-
-      const payload = {
-        name: String(formData.get("name") || "").trim(),
-        country: String(formData.get("country") || "").trim(),
-        world_rank: String(formData.get("world_rank") || "").trim(),
-        acceptance_rate: String(formData.get("acceptance_rate") || "").trim(),
-        requirements: String(formData.get("requirements") || "").trim(),
-        tier: String(formData.get("tier") || "").trim(),
-        image_url: String(formData.get("image_url") || "").trim(),
-        website_url: String(formData.get("website_url") || "").trim(),
-      };
-
-      const { error } = await supabase.from("universities").insert([payload]);
-      if (error) throw error;
-
-      alert("University added!");
-      form.reset();
-      await fetchAllData();
-    } catch (error: any) {
+    if (error) {
       alert("Error adding university: " + error.message);
-    } finally {
-      setActionLoading(false);
+      return;
     }
+
+    alert("University added!");
+    form.reset();
+    await fetchAllData();
   };
 
   const handleUpdateUniversity = async (
@@ -291,200 +338,133 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     if (!editingUniversity) return;
 
-    try {
-      setActionLoading(true);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
 
-      const form = e.currentTarget;
-      const formData = new FormData(form);
+    const { error } = await supabase
+      .from("universities")
+      .update({
+        name: String(fd.get("name") || "").trim(),
+        country: String(fd.get("country") || "").trim(),
+        world_rank: String(fd.get("world_rank") || "").trim(),
+        acceptance_rate: String(fd.get("acceptance_rate") || "").trim(),
+        requirements: String(fd.get("requirements") || "").trim(),
+        tier: String(fd.get("tier") || "").trim(),
+        image_url: String(fd.get("image_url") || "").trim(),
+        website_url: String(fd.get("website_url") || "").trim(),
+      })
+      .eq("id", editingUniversity.id);
 
-      const payload = {
-        name: String(formData.get("name") || "").trim(),
-        country: String(formData.get("country") || "").trim(),
-        world_rank: String(formData.get("world_rank") || "").trim(),
-        acceptance_rate: String(formData.get("acceptance_rate") || "").trim(),
-        requirements: String(formData.get("requirements") || "").trim(),
-        tier: String(formData.get("tier") || "").trim(),
-        image_url: String(formData.get("image_url") || "").trim(),
-        website_url: String(formData.get("website_url") || "").trim(),
-      };
-
-      const { error } = await supabase
-        .from("universities")
-        .update(payload)
-        .eq("id", editingUniversity.id);
-
-      if (error) throw error;
-
-      alert("University updated!");
-      setEditingUniversity(null);
-      await fetchAllData();
-    } catch (error: any) {
+    if (error) {
       alert("Error updating university: " + error.message);
-    } finally {
-      setActionLoading(false);
+      return;
     }
-  };
 
-  const handleAddProgram = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    try {
-      setActionLoading(true);
-
-      const form = e.currentTarget;
-      const formData = new FormData(form);
-
-      const payload = {
-        title: String(formData.get("title") || "").trim(),
-        category: String(formData.get("category") || "").trim(),
-        short_description: String(formData.get("short_description") || "").trim(),
-        benefits: String(formData.get("benefits") || "").trim(),
-        cta_text: String(formData.get("cta_text") || "").trim(),
-      };
-
-      const { error } = await supabase.from("programs").insert([payload]);
-      if (error) throw error;
-
-      alert("Program added!");
-      form.reset();
-      await fetchAllData();
-    } catch (error: any) {
-      alert("Error adding program: " + error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleAddEvent = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-
-    try {
-      setActionLoading(true);
-
-      const form = e.currentTarget;
-      const formData = new FormData(form);
-
-      const payload = {
-        title: String(formData.get("title") || "").trim(),
-        date: String(formData.get("date") || "").trim(),
-        location: String(formData.get("location") || "").trim(),
-        description: String(formData.get("description") || "").trim(),
-        image_url: String(formData.get("image_url") || "").trim(),
-      };
-
-      const { error } = await supabase.from("events").insert([payload]);
-      if (error) throw error;
-
-      alert("Event added!");
-      form.reset();
-      await fetchAllData();
-    } catch (error: any) {
-      alert("Error adding event: " + error.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const deleteMentor = async (id: string) => {
-    const ok = confirm("Delete this mentor?");
-    if (!ok) return;
-
-    try {
-      setActionLoading(true);
-
-      const { error } = await supabase.from("mentors").delete().eq("id", id);
-      if (error) throw error;
-
-      if (editingMentor?.id === id) setEditingMentor(null);
-
-      await fetchAllData();
-    } catch (error: any) {
-      alert("Error deleting mentor: " + error.message);
-    } finally {
-      setActionLoading(false);
-    }
+    alert("University updated!");
+    setEditingUniversity(null);
+    await fetchAllData();
   };
 
   const deleteUniversity = async (id: string) => {
     const ok = confirm("Delete this university?");
     if (!ok) return;
 
-    try {
-      setActionLoading(true);
+    const { error } = await supabase.from("universities").delete().eq("id", id);
 
-      const { error } = await supabase
-        .from("universities")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      if (editingUniversity?.id === id) setEditingUniversity(null);
-
-      await fetchAllData();
-    } catch (error: any) {
+    if (error) {
       alert("Error deleting university: " + error.message);
-    } finally {
-      setActionLoading(false);
+      return;
     }
+
+    if (editingUniversity?.id === id) {
+      setEditingUniversity(null);
+    }
+
+    await fetchAllData();
+  };
+
+  const handleAddProgram = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+
+    const { error } = await supabase.from("programs").insert([
+      {
+        title: String(fd.get("title") || "").trim(),
+        category: String(fd.get("category") || "").trim(),
+        short_description: String(fd.get("short_description") || "").trim(),
+        benefits: String(fd.get("benefits") || "").trim(),
+        cta_text: String(fd.get("cta_text") || "").trim(),
+      },
+    ]);
+
+    if (error) {
+      alert("Error adding program: " + error.message);
+      return;
+    }
+
+    alert("Program added!");
+    form.reset();
+    await fetchAllData();
   };
 
   const deleteProgram = async (id: string) => {
     const ok = confirm("Delete this program?");
     if (!ok) return;
 
-    try {
-      setActionLoading(true);
+    const { error } = await supabase.from("programs").delete().eq("id", id);
 
-      const { error } = await supabase.from("programs").delete().eq("id", id);
-      if (error) throw error;
-
-      await fetchAllData();
-    } catch (error: any) {
+    if (error) {
       alert("Error deleting program: " + error.message);
-    } finally {
-      setActionLoading(false);
+      return;
     }
+
+    await fetchAllData();
+  };
+
+  const handleAddEvent = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+
+    const { error } = await supabase.from("events").insert([
+      {
+        title: String(fd.get("title") || "").trim(),
+        date: String(fd.get("date") || "").trim(),
+        location: String(fd.get("location") || "").trim(),
+        description: String(fd.get("description") || "").trim(),
+        image_url: String(fd.get("image_url") || "").trim(),
+      },
+    ]);
+
+    if (error) {
+      alert("Error adding event: " + error.message);
+      return;
+    }
+
+    alert("Event added!");
+    form.reset();
+    await fetchAllData();
   };
 
   const deleteEvent = async (id: string) => {
     const ok = confirm("Delete this event?");
     if (!ok) return;
 
-    try {
-      setActionLoading(true);
+    const { error } = await supabase.from("events").delete().eq("id", id);
 
-      const { error } = await supabase.from("events").delete().eq("id", id);
-      if (error) throw error;
-
-      await fetchAllData();
-    } catch (error: any) {
+    if (error) {
       alert("Error deleting event: " + error.message);
-    } finally {
-      setActionLoading(false);
+      return;
     }
-  };
 
-  const getTelegramLink = (telegram?: string | null) => {
-    if (!telegram) return "#";
-    const clean = telegram.replace("@", "").replace(/\s+/g, "").trim();
-    return clean ? `https://t.me/${clean}` : "#";
-  };
-
-  const getStatusBadgeClass = (status: ApplicationStatus) => {
-    if (status === "accepted")
-      return "bg-green-100 text-green-700 border-green-200";
-    if (status === "rejected")
-      return "bg-red-100 text-red-700 border-red-200";
-    return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    await fetchAllData();
   };
 
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-[#F8FBFF]">
-        <p className="text-lg font-medium text-[#0B2341]">
-          Loading admin panel...
-        </p>
+      <main className="min-h-screen flex items-center justify-center">
+        <p>Loading admin panel...</p>
       </main>
     );
   }
@@ -492,7 +472,7 @@ export default function AdminDashboardPage() {
   return (
     <main className="min-h-screen bg-[#F8FBFF] px-6 py-12">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-4xl font-bold text-[#0B2341]">
               Admin Dashboard
@@ -503,7 +483,6 @@ export default function AdminDashboardPage() {
           </div>
 
           <button
-            type="button"
             onClick={handleLogout}
             className="rounded-full bg-red-500 px-5 py-2.5 text-white font-semibold hover:bg-red-600 transition"
           >
@@ -517,30 +496,160 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        <div className="mt-8 grid gap-6 md:grid-cols-4">
+        <div className="mt-8 grid gap-6 md:grid-cols-5">
           <div className="bg-white rounded-2xl p-6 shadow border">
             <h2 className="text-lg text-gray-500">Applications</h2>
             <p className="text-3xl font-bold text-[#0E5A97] mt-2">
               {applications.length}
             </p>
           </div>
+
           <div className="bg-white rounded-2xl p-6 shadow border">
             <h2 className="text-lg text-gray-500">Mentors</h2>
             <p className="text-3xl font-bold text-[#4FAF3D] mt-2">
               {mentors.length}
             </p>
           </div>
+
           <div className="bg-white rounded-2xl p-6 shadow border">
             <h2 className="text-lg text-gray-500">Universities</h2>
             <p className="text-3xl font-bold text-[#F5B321] mt-2">
               {universities.length}
             </p>
           </div>
+
           <div className="bg-white rounded-2xl p-6 shadow border">
             <h2 className="text-lg text-gray-500">Programs</h2>
             <p className="text-3xl font-bold text-[#0B2341] mt-2">
               {programs.length}
             </p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow border">
+            <h2 className="text-lg text-gray-500">Events</h2>
+            <p className="text-3xl font-bold text-purple-600 mt-2">
+              {events.length}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-12 bg-white rounded-3xl shadow p-8 border">
+          <h2 className="text-2xl font-bold text-[#0B2341]">
+            Applications List
+          </h2>
+
+          <div className="mt-6 space-y-6">
+            {applications.map((app) => (
+              <div
+                key={app.id}
+                className="rounded-2xl border border-gray-200 p-6 bg-[#F8FBFF]"
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm text-gray-500">Full Name</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.full_name}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Email</p>
+                    <p className="font-semibold text-[#0B2341]">{app.email}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Phone</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.phone || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Telegram</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.telegram || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Program</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.program_type || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Scholarship</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.scholarship || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Target Country</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.target_country || "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-500">Dream University</p>
+                    <p className="font-semibold text-[#0B2341]">
+                      {app.dream_university || "-"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500">Goal / Motivation</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[#0B2341]">
+                    {app.goal || "-"}
+                  </p>
+                </div>
+
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <span className="rounded-full bg-white border px-4 py-2 text-sm font-semibold">
+                    Status: {app.status}
+                  </span>
+
+                  {app.telegram && (
+                    <a
+                      href={getTelegramLink(app.telegram)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full bg-[#229ED9] text-white px-4 py-2 text-sm font-semibold"
+                    >
+                      Open Telegram
+                    </a>
+                  )}
+
+                  <button
+                    onClick={() => updateStatus(app.id, "accepted")}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg"
+                  >
+                    Accept
+                  </button>
+
+                  <button
+                    onClick={() => updateStatus(app.id, "rejected")}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg"
+                  >
+                    Reject
+                  </button>
+
+                  <button
+                    onClick={() => updateStatus(app.id, "pending")}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {applications.length === 0 && (
+              <p className="text-gray-500">No applications yet.</p>
+            )}
           </div>
         </div>
 
@@ -571,16 +680,24 @@ export default function AdminDashboardPage() {
               placeholder="Expertise"
               className="border p-3 rounded-xl"
             />
-            <input
-              name="image_url"
-              placeholder="/mentors/mentor1.jpg"
-              className="border p-3 rounded-xl"
-            />
+
+            <div className="rounded-xl border p-4 bg-[#F8FBFF]">
+              <label className="block text-sm font-medium text-[#0B2341] mb-2">
+                Mentor Photo
+              </label>
+              <input
+                type="file"
+                name="mentor_photo"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                className="w-full"
+              />
+            </div>
+
             <button
-              type="submit"
-              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition"
+              disabled={mentorUploading}
+              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition disabled:opacity-60"
             >
-              Add Mentor
+              {mentorUploading ? "Uploading..." : "Add Mentor"}
             </button>
           </form>
 
@@ -590,16 +707,23 @@ export default function AdminDashboardPage() {
                 key={mentor.id}
                 className="flex items-center justify-between rounded-xl border p-4 bg-[#F8FBFF]"
               >
-                <div>
-                  <p className="font-semibold">{mentor.name}</p>
-                  <p className="text-sm text-gray-600">{mentor.role}</p>
+                <div className="flex items-center gap-4">
+                  <img
+                    src={mentor.image_url || "/logo.png"}
+                    alt={mentor.name}
+                    className="w-14 h-14 rounded-full object-cover border"
+                  />
+                  <div>
+                    <p className="font-semibold">{mentor.name}</p>
+                    <p className="text-sm text-gray-600">{mentor.role}</p>
+                  </div>
                 </div>
 
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEditingMentor(mentor)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg"
                   >
                     Edit
                   </button>
@@ -607,7 +731,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => deleteMentor(mentor.id)}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg"
                   >
                     Delete
                   </button>
@@ -631,7 +755,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setEditingMentor(null)}
-                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300 transition"
+                className="rounded-lg bg-gray-200 px-4 py-2"
               >
                 Cancel
               </button>
@@ -658,20 +782,35 @@ export default function AdminDashboardPage() {
               />
               <input
                 name="expertise"
-                defaultValue={editingMentor.expertise || ""}
-                className="border p-3 rounded-xl"
-              />
-              <input
-                name="image_url"
-                defaultValue={editingMentor.image_url || ""}
+                defaultValue={editingMentor.expertise}
                 className="border p-3 rounded-xl"
               />
 
+              {editingMentor.image_url && (
+                <img
+                  src={editingMentor.image_url}
+                  alt={editingMentor.name}
+                  className="w-24 h-24 rounded-full object-cover border"
+                />
+              )}
+
+              <div className="rounded-xl border p-4 bg-[#F8FBFF]">
+                <label className="block text-sm font-medium text-[#0B2341] mb-2">
+                  Replace Mentor Photo
+                </label>
+                <input
+                  type="file"
+                  name="mentor_photo"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="w-full"
+                />
+              </div>
+
               <button
-                type="submit"
-                className="bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition"
+                disabled={mentorEditUploading}
+                className="bg-green-600 text-white py-3 rounded-xl font-semibold disabled:opacity-60"
               >
-                Update Mentor
+                {mentorEditUploading ? "Uploading..." : "Update Mentor"}
               </button>
             </form>
           </div>
@@ -750,7 +889,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setEditingUniversity(uni)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg"
                   >
                     Edit
                   </button>
@@ -758,7 +897,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={() => deleteUniversity(uni.id)}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg"
                   >
                     Delete
                   </button>
@@ -782,7 +921,7 @@ export default function AdminDashboardPage() {
               <button
                 type="button"
                 onClick={() => setEditingUniversity(null)}
-                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300 transition"
+                className="rounded-lg bg-gray-200 px-4 py-2"
               >
                 Cancel
               </button>
@@ -792,38 +931,33 @@ export default function AdminDashboardPage() {
               <input
                 name="name"
                 defaultValue={editingUniversity.name}
-                placeholder="University Name"
                 className="border p-3 rounded-xl"
                 required
               />
               <input
                 name="country"
                 defaultValue={editingUniversity.country}
-                placeholder="Country"
                 className="border p-3 rounded-xl"
                 required
               />
               <input
                 name="world_rank"
-                defaultValue={editingUniversity.world_rank || ""}
-                placeholder="World Rank"
+                defaultValue={editingUniversity.world_rank}
                 className="border p-3 rounded-xl"
               />
               <input
                 name="acceptance_rate"
-                defaultValue={editingUniversity.acceptance_rate || ""}
-                placeholder="Acceptance Rate"
+                defaultValue={editingUniversity.acceptance_rate}
                 className="border p-3 rounded-xl"
               />
               <textarea
                 name="requirements"
-                defaultValue={editingUniversity.requirements || ""}
-                placeholder="Requirements"
+                defaultValue={editingUniversity.requirements}
                 className="border p-3 rounded-xl"
               />
               <select
                 name="tier"
-                defaultValue={editingUniversity.tier || "Top Global"}
+                defaultValue={editingUniversity.tier}
                 className="border p-3 rounded-xl"
               >
                 <option value="Ivy League">Ivy League</option>
@@ -833,21 +967,16 @@ export default function AdminDashboardPage() {
               </select>
               <input
                 name="image_url"
-                defaultValue={editingUniversity.image_url || ""}
-                placeholder="/universities/harvard.jpg"
+                defaultValue={editingUniversity.image_url}
                 className="border p-3 rounded-xl"
               />
               <input
                 name="website_url"
-                defaultValue={editingUniversity.website_url || ""}
-                placeholder="https://www.harvard.edu"
+                defaultValue={editingUniversity.website_url}
                 className="border p-3 rounded-xl"
               />
 
-              <button
-                type="submit"
-                className="bg-green-600 text-white py-3 rounded-xl font-semibold hover:bg-green-700 transition"
-              >
+              <button className="bg-green-600 text-white py-3 rounded-xl font-semibold">
                 Update University
               </button>
             </form>
@@ -888,10 +1017,7 @@ export default function AdminDashboardPage() {
               required
             />
 
-            <button
-              type="submit"
-              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition"
-            >
+            <button className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition">
               Add Program
             </button>
           </form>
@@ -910,7 +1036,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => deleteProgram(program.id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg"
                 >
                   Delete
                 </button>
@@ -954,10 +1080,7 @@ export default function AdminDashboardPage() {
               className="border p-3 rounded-xl"
             />
 
-            <button
-              type="submit"
-              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition"
-            >
+            <button className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition">
               Add Event
             </button>
           </form>
@@ -971,14 +1094,14 @@ export default function AdminDashboardPage() {
                 <div>
                   <p className="font-semibold">{event.title}</p>
                   <p className="text-sm text-gray-600">
-                    {event.date || "No date"} • {event.location || "No location"}
+                    {event.date} • {event.location}
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => deleteEvent(event.id)}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg"
                 >
                   Delete
                 </button>
@@ -989,128 +1112,6 @@ export default function AdminDashboardPage() {
               <p className="text-gray-500">No events yet.</p>
             )}
           </div>
-        </div>
-
-        <div className="mt-12 bg-white rounded-3xl shadow p-8 border">
-          <h2 className="text-2xl font-bold text-[#0B2341]">
-            Applications List
-          </h2>
-
-          {applications.length === 0 ? (
-            <p className="mt-6 text-gray-500">No applications yet.</p>
-          ) : (
-            <div className="mt-6 space-y-6">
-              {applications.map((app) => (
-                <div
-                  key={app.id}
-                  className="rounded-2xl border border-gray-200 p-6 bg-[#F8FBFF]"
-                >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <p className="text-sm text-gray-500">Full Name</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.full_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-semibold text-[#0B2341] break-all">
-                        {app.email}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Phone</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.phone || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Telegram</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.telegram || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Program</p>
-                      <p className="font-semibold text-[#0B2341] capitalize">
-                        {app.program_type}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Scholarship</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.scholarship || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Target Country</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.target_country || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Dream University</p>
-                      <p className="font-semibold text-[#0B2341]">
-                        {app.dream_university || "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-500">Goal / Motivation</p>
-                    <p className="mt-1 whitespace-pre-wrap text-[#0B2341]">
-                      {app.goal}
-                    </p>
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap items-center gap-3">
-                    <span
-                      className={`rounded-full border px-4 py-2 text-sm font-semibold ${getStatusBadgeClass(
-                        app.status
-                      )}`}
-                    >
-                      Status: {app.status}
-                    </span>
-
-                    {app.telegram && getTelegramLink(app.telegram) !== "#" && (
-                      <a
-                        href={getTelegramLink(app.telegram)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-full bg-[#229ED9] text-white px-4 py-2 text-sm font-semibold hover:opacity-90 transition"
-                      >
-                        Open Telegram
-                      </a>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => updateStatus(app.id, "accepted")}
-                      className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition"
-                    >
-                      Accept
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateStatus(app.id, "rejected")}
-                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition"
-                    >
-                      Reject
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => updateStatus(app.id, "pending")}
-                      className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </main>

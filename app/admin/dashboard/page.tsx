@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-
-const ADMIN_EMAIL = "unipathuzbekistan@gmail.com";
 
 type Application = {
   id: string;
@@ -17,6 +15,7 @@ type Application = {
   dream_university?: string;
   goal?: string;
   status: string;
+  created_at?: string;
 };
 
 type Mentor = {
@@ -26,6 +25,7 @@ type Mentor = {
   bio: string;
   expertise?: string;
   image_url?: string;
+  created_at?: string;
 };
 
 type University = {
@@ -38,6 +38,7 @@ type University = {
   tier?: string;
   image_url?: string;
   website_url?: string;
+  created_at?: string;
 };
 
 type Program = {
@@ -47,6 +48,7 @@ type Program = {
   short_description?: string;
   benefits?: string;
   cta_text?: string;
+  created_at?: string;
 };
 
 type EventItem = {
@@ -56,7 +58,10 @@ type EventItem = {
   location?: string;
   description?: string;
   image_url?: string;
+  created_at?: string;
 };
+
+const ADMIN_EMAIL = "unipathuzbekistan@gmail.com";
 
 export default function AdminDashboardPage() {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -66,22 +71,26 @@ export default function AdminDashboardPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
 
   const [editingMentor, setEditingMentor] = useState<Mentor | null>(null);
-  const [editingUniversity, setEditingUniversity] = useState<University | null>(null);
+  const [editingUniversity, setEditingUniversity] =
+    useState<University | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [mentorUploading, setMentorUploading] = useState(false);
   const [mentorEditUploading, setMentorEditUploading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+
+  const [appSearch, setAppSearch] = useState("");
+  const [appStatusFilter, setAppStatusFilter] = useState("all");
+  const [selectedApplication, setSelectedApplication] =
+    useState<Application | null>(null);
 
   useEffect(() => {
     const checkAdminAndLoad = async () => {
       try {
         const {
           data: { user },
-          error,
         } = await supabase.auth.getUser();
 
-        if (error || !user || user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+        if (user?.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
           window.location.href = "/admin/login";
           return;
         }
@@ -147,32 +156,47 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const filteredApplications = useMemo(() => {
+    return applications.filter((app) => {
+      const q = appSearch.trim().toLowerCase();
+
+      const matchesSearch =
+        q === "" ||
+        (app.full_name || "").toLowerCase().includes(q) ||
+        (app.email || "").toLowerCase().includes(q) ||
+        (app.phone || "").toLowerCase().includes(q) ||
+        (app.telegram || "").toLowerCase().includes(q) ||
+        (app.program_type || "").toLowerCase().includes(q);
+
+      const matchesStatus =
+        appStatusFilter === "all" ? true : app.status === appStatusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [applications, appSearch, appStatusFilter]);
+
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      window.location.href = "/admin/login";
-    } catch (error: any) {
-      alert("Error logging out: " + error.message);
-    }
+    await supabase.auth.signOut();
+    window.location.href = "/admin/login";
   };
 
   const updateStatus = async (id: string, status: string) => {
-    try {
-      setActionLoading(true);
+    const { error } = await supabase
+      .from("applications")
+      .update({ status })
+      .eq("id", id);
 
-      const { error } = await supabase
-        .from("applications")
-        .update({ status })
-        .eq("id", id);
+    if (error) {
+      alert("Error updating status: " + error.message);
+      return;
+    }
 
-      if (error) {
-        alert("Error updating status: " + error.message);
-        return;
-      }
+    await fetchAllData();
 
-      await fetchAllData();
-    } finally {
-      setActionLoading(false);
+    if (selectedApplication?.id === id) {
+      setSelectedApplication((prev) =>
+        prev ? { ...prev, status } : prev
+      );
     }
   };
 
@@ -220,10 +244,10 @@ export default function AdminDashboardPage() {
 
       const { error } = await supabase.from("mentors").insert([
         {
-          name: String(fd.get("name") || "").trim(),
-          role: String(fd.get("role") || "").trim(),
-          bio: String(fd.get("bio") || "").trim(),
-          expertise: String(fd.get("expertise") || "").trim(),
+          name: fd.get("name"),
+          role: fd.get("role"),
+          bio: fd.get("bio"),
+          expertise: fd.get("expertise"),
           image_url: imageUrl,
         },
       ]);
@@ -263,10 +287,10 @@ export default function AdminDashboardPage() {
       const { error } = await supabase
         .from("mentors")
         .update({
-          name: String(fd.get("name") || "").trim(),
-          role: String(fd.get("role") || "").trim(),
-          bio: String(fd.get("bio") || "").trim(),
-          expertise: String(fd.get("expertise") || "").trim(),
+          name: fd.get("name"),
+          role: fd.get("role"),
+          bio: fd.get("bio"),
+          expertise: fd.get("expertise"),
           image_url: imageUrl,
         })
         .eq("id", editingMentor.id);
@@ -311,14 +335,14 @@ export default function AdminDashboardPage() {
 
     const { error } = await supabase.from("universities").insert([
       {
-        name: String(fd.get("name") || "").trim(),
-        country: String(fd.get("country") || "").trim(),
-        world_rank: String(fd.get("world_rank") || "").trim(),
-        acceptance_rate: String(fd.get("acceptance_rate") || "").trim(),
-        requirements: String(fd.get("requirements") || "").trim(),
-        tier: String(fd.get("tier") || "").trim(),
-        image_url: String(fd.get("image_url") || "").trim(),
-        website_url: String(fd.get("website_url") || "").trim(),
+        name: fd.get("name"),
+        country: fd.get("country"),
+        world_rank: fd.get("world_rank"),
+        acceptance_rate: fd.get("acceptance_rate"),
+        requirements: fd.get("requirements"),
+        tier: fd.get("tier"),
+        image_url: fd.get("image_url"),
+        website_url: fd.get("website_url"),
       },
     ]);
 
@@ -344,14 +368,14 @@ export default function AdminDashboardPage() {
     const { error } = await supabase
       .from("universities")
       .update({
-        name: String(fd.get("name") || "").trim(),
-        country: String(fd.get("country") || "").trim(),
-        world_rank: String(fd.get("world_rank") || "").trim(),
-        acceptance_rate: String(fd.get("acceptance_rate") || "").trim(),
-        requirements: String(fd.get("requirements") || "").trim(),
-        tier: String(fd.get("tier") || "").trim(),
-        image_url: String(fd.get("image_url") || "").trim(),
-        website_url: String(fd.get("website_url") || "").trim(),
+        name: fd.get("name"),
+        country: fd.get("country"),
+        world_rank: fd.get("world_rank"),
+        acceptance_rate: fd.get("acceptance_rate"),
+        requirements: fd.get("requirements"),
+        tier: fd.get("tier"),
+        image_url: fd.get("image_url"),
+        website_url: fd.get("website_url"),
       })
       .eq("id", editingUniversity.id);
 
@@ -390,11 +414,11 @@ export default function AdminDashboardPage() {
 
     const { error } = await supabase.from("programs").insert([
       {
-        title: String(fd.get("title") || "").trim(),
-        category: String(fd.get("category") || "").trim(),
-        short_description: String(fd.get("short_description") || "").trim(),
-        benefits: String(fd.get("benefits") || "").trim(),
-        cta_text: String(fd.get("cta_text") || "").trim(),
+        title: fd.get("title"),
+        category: fd.get("category"),
+        short_description: fd.get("short_description"),
+        benefits: fd.get("benefits"),
+        cta_text: fd.get("cta_text"),
       },
     ]);
 
@@ -429,11 +453,11 @@ export default function AdminDashboardPage() {
 
     const { error } = await supabase.from("events").insert([
       {
-        title: String(fd.get("title") || "").trim(),
-        date: String(fd.get("date") || "").trim(),
-        location: String(fd.get("location") || "").trim(),
-        description: String(fd.get("description") || "").trim(),
-        image_url: String(fd.get("image_url") || "").trim(),
+        title: fd.get("title"),
+        date: fd.get("date"),
+        location: fd.get("location"),
+        description: fd.get("description"),
+        image_url: fd.get("image_url"),
       },
     ]);
 
@@ -459,6 +483,16 @@ export default function AdminDashboardPage() {
     }
 
     await fetchAllData();
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    if (status === "accepted") {
+      return "bg-green-500 text-white";
+    }
+    if (status === "rejected") {
+      return "bg-red-500 text-white";
+    }
+    return "bg-yellow-500 text-white";
   };
 
   if (loading) {
@@ -489,12 +523,6 @@ export default function AdminDashboardPage() {
             Logout
           </button>
         </div>
-
-        {actionLoading && (
-          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            Processing request...
-          </div>
-        )}
 
         <div className="mt-8 grid gap-6 md:grid-cols-5">
           <div className="bg-white rounded-2xl p-6 shadow border">
@@ -534,124 +562,246 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="mt-12 bg-white rounded-3xl shadow p-8 border">
-          <h2 className="text-2xl font-bold text-[#0B2341]">
-            Applications List
-          </h2>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="text-2xl font-bold text-[#0B2341]">Applications</h2>
 
-          <div className="mt-6 space-y-6">
-            {applications.map((app) => (
-              <div
-                key={app.id}
-                className="rounded-2xl border border-gray-200 p-6 bg-[#F8FBFF]"
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <input
+                type="text"
+                placeholder="Search by name, email, phone..."
+                value={appSearch}
+                onChange={(e) => setAppSearch(e.target.value)}
+                className="border px-4 py-2 rounded-xl min-w-[260px]"
+              />
+
+              <select
+                value={appStatusFilter}
+                onChange={(e) => setAppStatusFilter(e.target.value)}
+                className="border px-4 py-2 rounded-xl"
               >
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="text-sm text-gray-500">Full Name</p>
-                    <p className="font-semibold text-[#0B2341]">
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse">
+              <thead>
+                <tr className="bg-[#F8FBFF] text-left">
+                  <th className="p-3 border-b">Name</th>
+                  <th className="p-3 border-b">Program</th>
+                  <th className="p-3 border-b">Status</th>
+                  <th className="p-3 border-b">Phone</th>
+                  <th className="p-3 border-b">Telegram</th>
+                  <th className="p-3 border-b">Country</th>
+                  <th className="p-3 border-b">Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredApplications.map((app) => (
+                  <tr key={app.id} className="hover:bg-[#FAFCFF]">
+                    <td className="p-3 border-b font-medium text-[#0B2341]">
                       {app.full_name}
-                    </p>
-                  </div>
+                    </td>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-semibold text-[#0B2341]">{app.email}</p>
-                  </div>
+                    <td className="p-3 border-b">{app.program_type || "-"}</td>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.phone || "-"}
-                    </p>
-                  </div>
+                    <td className="p-3 border-b">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadgeClass(
+                          app.status
+                        )}`}
+                      >
+                        {app.status}
+                      </span>
+                    </td>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Telegram</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.telegram || "-"}
-                    </p>
-                  </div>
+                    <td className="p-3 border-b">{app.phone || "-"}</td>
+                    <td className="p-3 border-b">{app.telegram || "-"}</td>
+                    <td className="p-3 border-b">{app.target_country || "-"}</td>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Program</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.program_type || "-"}
-                    </p>
-                  </div>
+                    <td className="p-3 border-b">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedApplication(app)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded-lg text-sm"
+                        >
+                          View
+                        </button>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Scholarship</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.scholarship || "-"}
-                    </p>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => updateStatus(app.id, "accepted")}
+                          className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm"
+                        >
+                          Accept
+                        </button>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Target Country</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.target_country || "-"}
-                    </p>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => updateStatus(app.id, "rejected")}
+                          className="bg-red-500 text-white px-3 py-1 rounded-lg text-sm"
+                        >
+                          Reject
+                        </button>
 
-                  <div>
-                    <p className="text-sm text-gray-500">Dream University</p>
-                    <p className="font-semibold text-[#0B2341]">
-                      {app.dream_university || "-"}
-                    </p>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={() => updateStatus(app.id, "pending")}
+                          className="bg-gray-500 text-white px-3 py-1 rounded-lg text-sm"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredApplications.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="p-6 text-center text-gray-500 border-b"
+                    >
+                      No applications found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {selectedApplication && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-2xl rounded-3xl bg-white p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-2xl font-bold text-[#0B2341]">
+                  {selectedApplication.full_name}
+                </h2>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedApplication(null)}
+                  className="rounded-lg bg-gray-200 px-4 py-2"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm text-gray-500">Email</p>
+                  <p className="font-semibold">{selectedApplication.email}</p>
                 </div>
 
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">Goal / Motivation</p>
-                  <p className="mt-1 whitespace-pre-wrap text-[#0B2341]">
-                    {app.goal || "-"}
+                <div>
+                  <p className="text-sm text-gray-500">Phone</p>
+                  <p className="font-semibold">
+                    {selectedApplication.phone || "-"}
                   </p>
                 </div>
 
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  <span className="rounded-full bg-white border px-4 py-2 text-sm font-semibold">
-                    Status: {app.status}
-                  </span>
+                <div>
+                  <p className="text-sm text-gray-500">Telegram</p>
+                  <p className="font-semibold">
+                    {selectedApplication.telegram || "-"}
+                  </p>
+                </div>
 
-                  {app.telegram && (
-                    <a
-                      href={getTelegramLink(app.telegram)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-full bg-[#229ED9] text-white px-4 py-2 text-sm font-semibold"
-                    >
-                      Open Telegram
-                    </a>
-                  )}
+                <div>
+                  <p className="text-sm text-gray-500">Program</p>
+                  <p className="font-semibold">
+                    {selectedApplication.program_type || "-"}
+                  </p>
+                </div>
 
-                  <button
-                    onClick={() => updateStatus(app.id, "accepted")}
-                    className="bg-green-500 text-white px-4 py-2 rounded-lg"
-                  >
-                    Accept
-                  </button>
+                <div>
+                  <p className="text-sm text-gray-500">Scholarship</p>
+                  <p className="font-semibold">
+                    {selectedApplication.scholarship || "-"}
+                  </p>
+                </div>
 
-                  <button
-                    onClick={() => updateStatus(app.id, "rejected")}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg"
-                  >
-                    Reject
-                  </button>
+                <div>
+                  <p className="text-sm text-gray-500">Target Country</p>
+                  <p className="font-semibold">
+                    {selectedApplication.target_country || "-"}
+                  </p>
+                </div>
 
-                  <button
-                    onClick={() => updateStatus(app.id, "pending")}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg"
-                  >
-                    Reset
-                  </button>
+                <div>
+                  <p className="text-sm text-gray-500">Dream University</p>
+                  <p className="font-semibold">
+                    {selectedApplication.dream_university || "-"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500">Status</p>
+                  <p className="font-semibold">
+                    {selectedApplication.status || "-"}
+                  </p>
                 </div>
               </div>
-            ))}
 
-            {applications.length === 0 && (
-              <p className="text-gray-500">No applications yet.</p>
-            )}
+              <div className="mt-6">
+                <p className="text-sm text-gray-500">Goal / Motivation</p>
+                <p className="mt-1 whitespace-pre-wrap text-[#0B2341]">
+                  {selectedApplication.goal || "-"}
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                {selectedApplication.telegram && (
+                  <a
+                    href={getTelegramLink(selectedApplication.telegram)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-full bg-[#229ED9] text-white px-4 py-2 text-sm font-semibold"
+                  >
+                    Open Telegram
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateStatus(selectedApplication.id, "accepted")
+                  }
+                  className="bg-green-500 text-white px-4 py-2 rounded-lg"
+                >
+                  Accept
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateStatus(selectedApplication.id, "rejected")
+                  }
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg"
+                >
+                  Reject
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateStatus(selectedApplication.id, "pending")
+                  }
+                  className="bg-gray-500 text-white px-4 py-2 rounded-lg"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="mt-12 bg-white rounded-3xl shadow p-8 border">
           <h2 className="text-2xl font-bold text-[#0B2341]">Add Mentor</h2>
@@ -976,7 +1126,10 @@ export default function AdminDashboardPage() {
                 className="border p-3 rounded-xl"
               />
 
-              <button className="bg-green-600 text-white py-3 rounded-xl font-semibold">
+              <button
+                type="submit"
+                className="bg-green-600 text-white py-3 rounded-xl font-semibold"
+              >
                 Update University
               </button>
             </form>
@@ -1017,7 +1170,10 @@ export default function AdminDashboardPage() {
               required
             />
 
-            <button className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition">
+            <button
+              type="submit"
+              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition"
+            >
               Add Program
             </button>
           </form>
@@ -1080,7 +1236,10 @@ export default function AdminDashboardPage() {
               className="border p-3 rounded-xl"
             />
 
-            <button className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition">
+            <button
+              type="submit"
+              className="bg-[#0B2341] text-white py-3 rounded-xl font-semibold hover:bg-[#0E5A97] transition"
+            >
               Add Event
             </button>
           </form>

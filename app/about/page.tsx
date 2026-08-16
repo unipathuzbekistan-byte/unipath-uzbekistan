@@ -1,6 +1,48 @@
+"use client";
+
+const partners = [
+  {
+    name: "IT Park Uzbekistan",
+    logo: "/logos/itpark.png",
+    bg: "#EAF4FF",
+    border: "#DCEAF7",
+    color: "#0E5A97",
+  },
+  {
+    name: "Prime School",
+    logo: "/logos/prime-school.jpg",
+    bg: "#EEF2FF",
+    border: "#D4DEF7",
+    color: "#0B2341",
+  },
+  {
+    name: "Prime MUN Society",
+    logo: "/logos/primemun.jpg",
+    bg: "#FFFBEF",
+    border: "#F8E4AE",
+    color: "#F5B321",
+  },
+];
+
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-white text-black">
+
+      {/* ── Marquee animation ─────────────────────────── */}
+      <style>{`
+        @keyframes marquee {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        .partners-track {
+          animation: marquee 32s linear infinite;
+        }
+        .partners-track:hover {
+          animation-play-state: paused;
+        }
+      `}</style>
+
+      {/* ── HERO ─────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#EAF4FF] via-white to-[#F4FBEF] px-6 py-24 md:py-28">
         <div className="absolute top-0 left-0 w-72 h-72 bg-[#0E5A97]/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-0 w-72 h-72 bg-[#4FAF3D]/10 rounded-full blur-3xl" />
@@ -10,16 +52,13 @@ export default function AboutPage() {
             <p className="text-sm uppercase tracking-[0.35em] text-[#0E5A97] font-semibold">
               About UniPath
             </p>
-
             <h1 className="mt-6 text-5xl md:text-7xl font-extrabold leading-tight text-[#0B2341]">
               Built to guide students toward global success
             </h1>
-
             <p className="mt-6 max-w-2xl text-lg md:text-xl text-gray-700 leading-8">
               UniPath Uzbekistan is designed to help ambitious students prepare
               for top universities, scholarships, and international
-              opportunities through mentorship, strategy, and structured
-              support.
+              opportunities through mentorship, strategy, and structured support.
             </p>
           </div>
 
@@ -42,29 +81,21 @@ export default function AboutPage() {
 
             <div className="mt-8 grid gap-4">
               <div className="rounded-2xl bg-[#F8FBFF] border border-[#DCEAF7] p-5">
-                <h3 className="text-lg font-semibold text-[#0E5A97]">
-                  Mission
-                </h3>
+                <h3 className="text-lg font-semibold text-[#0E5A97]">Mission</h3>
                 <p className="mt-2 text-gray-600">
                   Make global education guidance more structured, accessible,
                   and practical for students.
                 </p>
               </div>
-
               <div className="rounded-2xl bg-[#F7FDF2] border border-[#E3F3D8] p-5">
-                <h3 className="text-lg font-semibold text-[#4FAF3D]">
-                  Vision
-                </h3>
+                <h3 className="text-lg font-semibold text-[#4FAF3D]">Vision</h3>
                 <p className="mt-2 text-gray-600">
                   Build a generation of students prepared to compete globally
                   with confidence and direction.
                 </p>
               </div>
-
               <div className="rounded-2xl bg-[#FFFBEF] border border-[#F8E4AE] p-5">
-                <h3 className="text-lg font-semibold text-[#F5B321]">
-                  Approach
-                </h3>
+                <h3 className="text-lg font-semibold text-[#F5B321]">Approach</h3>
                 <p className="mt-2 text-gray-600">
                   Combine mentorship, planning, and accountability in one
                   powerful platform.
@@ -75,6 +106,7 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── WHY WE EXIST ─────────────────────────────── */}
       <section className="px-6 py-20 bg-white">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-start">
           <div>
@@ -98,28 +130,20 @@ export default function AboutPage() {
 
           <div className="grid gap-6">
             <div className="rounded-3xl border border-[#DCEAF7] p-7 shadow-sm bg-[#F8FBFF]">
-              <h3 className="text-2xl font-semibold text-[#0E5A97]">
-                Structure
-              </h3>
+              <h3 className="text-2xl font-semibold text-[#0E5A97]">Structure</h3>
               <p className="mt-3 text-gray-600 leading-7">
                 Step-by-step systems that make preparation manageable and clear.
               </p>
             </div>
-
             <div className="rounded-3xl border border-[#E3F3D8] p-7 shadow-sm bg-[#F7FDF2]">
-              <h3 className="text-2xl font-semibold text-[#4FAF3D]">
-                Mentorship
-              </h3>
+              <h3 className="text-2xl font-semibold text-[#4FAF3D]">Mentorship</h3>
               <p className="mt-3 text-gray-600 leading-7">
                 Real guidance, accountability, and support from people who care
                 about student growth.
               </p>
             </div>
-
             <div className="rounded-3xl border border-[#F8E4AE] p-7 shadow-sm bg-[#FFFBEF]">
-              <h3 className="text-2xl font-semibold text-[#F5B321]">
-                Opportunity
-              </h3>
+              <h3 className="text-2xl font-semibold text-[#F5B321]">Opportunity</h3>
               <p className="mt-3 text-gray-600 leading-7">
                 Preparation for universities, scholarships, leadership programs,
                 and international pathways.
@@ -129,6 +153,7 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── OUR IMPACT ───────────────────────────────── */}
       <section className="px-6 py-20 bg-[#F8FBFF]">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-sm uppercase tracking-[0.35em] text-[#0E5A97] font-semibold">
@@ -147,17 +172,14 @@ export default function AboutPage() {
               <p className="text-4xl font-extrabold text-[#0E5A97]">100+</p>
               <p className="mt-2 text-gray-600">Students Guided</p>
             </div>
-
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-[#E3F3D8]">
               <p className="text-4xl font-extrabold text-[#4FAF3D]">20+</p>
               <p className="mt-2 text-gray-600">Programs & Opportunities</p>
             </div>
-
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-[#F8E4AE]">
               <p className="text-4xl font-extrabold text-[#F5B321]">1:1</p>
               <p className="mt-2 text-gray-600">Mentorship Support</p>
             </div>
-
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-[#DCEAF7]">
               <p className="text-4xl font-extrabold text-[#0B2341]">24/7</p>
               <p className="mt-2 text-gray-600">Long-Term Vision</p>
@@ -166,7 +188,59 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── HAMKORLAR (PARTNERS) ─────────────────────── */}
       <section className="px-6 py-20 bg-white">
+        <div className="max-w-7xl mx-auto text-center mb-12">
+          <p className="text-sm uppercase tracking-[0.35em] text-[#4FAF3D] font-semibold">
+            Our Partners
+          </p>
+          <h2 className="mt-4 text-4xl md:text-5xl font-bold text-[#0B2341]">
+            Our Partners
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 max-w-xl mx-auto">
+            We are creating new opportunities for students in collaboration with reliable organizations.
+          </p>
+        </div>
+
+        <div className="relative overflow-hidden">
+          {/* Left & right fade edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-28 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-28 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+          {/* Scrolling track — duplicated for seamless loop */}
+          <div className="partners-track flex gap-6 w-max cursor-default">
+            {[...partners, ...partners].map((p, i) => (
+              <div
+                key={i}
+                className="group flex flex-col items-center justify-center w-48 h-24 rounded-2xl border px-5 flex-shrink-0 transition-all duration-300 hover:shadow-lg hover:scale-105"
+                style={{ backgroundColor: p.bg, borderColor: p.border }}
+              >
+                <img
+                  src={p.logo}
+                  alt={p.name}
+                  className="h-10 w-auto object-contain"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    img.style.display = "none";
+                    const fallback = img.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = "flex";
+                  }}
+                />
+                {/* Text fallback when logo image is missing */}
+                <span
+                  className="hidden items-center justify-center text-xs font-bold text-center leading-tight px-2"
+                  style={{ color: p.color }}
+                >
+                  {p.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── THE GOAL ─────────────────────────────────── */}
+      <section className="px-6 py-20 bg-[#F8FBFF]">
         <div className="max-w-5xl mx-auto text-center">
           <p className="text-sm uppercase tracking-[0.35em] text-[#4FAF3D] font-semibold">
             The Goal
@@ -179,7 +253,6 @@ export default function AboutPage() {
             system where students can prepare, improve, stay consistent, and
             move toward top opportunities with clarity and confidence.
           </p>
-
           <div className="mt-8">
             <a
               href="/signup"
@@ -190,6 +263,7 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
     </main>
   );
 }

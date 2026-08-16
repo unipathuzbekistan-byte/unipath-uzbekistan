@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 const ADMIN_EMAIL = "unipathuzbekistan@gmail.com";
 
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(ADMIN_EMAIL);
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,6 +19,11 @@ export default function AdminLoginPage() {
       setLoading(true);
 
       const normalizedEmail = email.trim().toLowerCase();
+
+      if (normalizedEmail !== ADMIN_EMAIL.toLowerCase()) {
+        setStatus("You are not authorized to access the admin panel.");
+        return;
+      }
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
@@ -35,15 +40,41 @@ export default function AdminLoginPage() {
 
       if (data.user.email?.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
         await supabase.auth.signOut();
-        localStorage.removeItem("isAdmin");
         setStatus("You are not authorized to access the admin panel.");
         return;
       }
 
-      localStorage.setItem("isAdmin", "true");
       window.location.href = "/admin/dashboard";
     } catch (error: any) {
       setStatus(error?.message || "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    try {
+      setStatus("");
+      setLoading(true);
+
+      const resetEmail = email.trim().toLowerCase() || ADMIN_EMAIL;
+
+      if (resetEmail !== ADMIN_EMAIL.toLowerCase()) {
+        setStatus("Only the authorized admin email can reset password.");
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/admin/update-password`,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setStatus("Password reset link has been sent to the admin email.");
+    } catch (error: any) {
+      setStatus(error?.message || "Could not send password reset email.");
     } finally {
       setLoading(false);
     }
@@ -53,8 +84,9 @@ export default function AdminLoginPage() {
     <main className="min-h-screen bg-gradient-to-br from-[#EAF4FF] via-white to-[#F4FBEF] px-6 py-16 flex items-center justify-center">
       <div className="w-full max-w-xl bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-10">
         <h1 className="text-3xl font-bold text-[#0B2341]">Admin Login</h1>
+
         <p className="mt-2 text-gray-600">
-          Log in with the authorized admin account.
+          Log in with the authorized UniPath admin account.
         </p>
 
         <form onSubmit={handleAdminLogin} className="mt-8 space-y-5">
@@ -62,6 +94,7 @@ export default function AdminLoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Admin Email
             </label>
+
             <input
               type="email"
               placeholder="unipathuzbekistan@gmail.com"
@@ -76,6 +109,7 @@ export default function AdminLoginPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
+
             <input
               type="password"
               placeholder="Enter admin password"
@@ -92,6 +126,15 @@ export default function AdminLoginPage() {
             className="w-full rounded-xl bg-[#0B2341] text-white py-3 font-semibold hover:bg-[#0E5A97] transition disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? "Checking..." : "Log In as Admin"}
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePasswordReset}
+            disabled={loading}
+            className="w-full rounded-xl border border-[#0B2341] text-[#0B2341] py-3 font-semibold hover:bg-[#EAF4FF] transition disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            Forgot password?
           </button>
         </form>
 

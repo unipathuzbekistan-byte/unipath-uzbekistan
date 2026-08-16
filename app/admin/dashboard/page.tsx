@@ -1002,6 +1002,7 @@ export default function AdminDashboardPage() {
               <option value="Top Global">Top Global</option>
               <option value="Top 100">Top 100</option>
               <option value="Top 300">Top 300</option>
+              <option value="Top Liberal Arts">Top Liberal Arts</option>
             </select>
             <input
               name="image_url"

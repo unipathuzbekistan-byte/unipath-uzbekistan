@@ -169,7 +169,7 @@ export default function AboutPage() {
 
           <div className="mt-12 grid gap-6 md:grid-cols-4">
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-[#DCEAF7]">
-              <p className="text-4xl font-extrabold text-[#0E5A97]">100+</p>
+              <p className="text-4xl font-extrabold text-[#0E5A97]">3000+</p>
               <p className="mt-2 text-gray-600">Students Guided</p>
             </div>
             <div className="rounded-3xl bg-white p-8 shadow-sm border border-[#E3F3D8]">

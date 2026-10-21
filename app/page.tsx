@@ -39,7 +39,7 @@ export default function Home() {
 
             <div className="mt-10 flex flex-wrap gap-8">
               <div>
-                <p className="text-3xl font-extrabold text-[#0B2341]">100+</p>
+                <p className="text-3xl font-extrabold text-[#0B2341]">3000+</p>
                 <p className="text-gray-600 mt-1">Students Guided</p>
               </div>
               <div>
